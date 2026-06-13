@@ -42,10 +42,12 @@ pipeline {
         }
         stage('UI Test') {
             steps {
-                echo "Stage 4: Running Selenium UI tests inside Jenkins container (has Chrome)..."
+                echo "Stage 4: Running Selenium UI tests on EC2 host via SSH..."
                 sh '''
-                    docker exec -e API_BASE_URL=http://172.17.0.1:5000 jenkins \
-                        python3 -m pytest /var/jenkins_home/workspace/sentiment-ci-pipeline/tests/test_ui.py -v
+                    ssh -i /var/jenkins_home/.ssh/host_key \
+                        -o StrictHostKeyChecking=no \
+                        ubuntu@172.17.0.1 \
+                        "cd /home/ubuntu/selfhealing-mlops-FA23-BAI-054 && API_BASE_URL=http://localhost:5000 python3 -m pytest tests/test_ui.py -v"
                 '''
             }
         }

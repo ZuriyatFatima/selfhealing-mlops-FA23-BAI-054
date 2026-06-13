@@ -1,0 +1,45 @@
+# ============================================================
+# k8s/service.yaml — The Front Desk (Traffic Router)
+# NodePort 32500 | Initially points to slot:blue
+# ONE kubectl patch command switches it to slot:green
+# Student: Zuriyat Fatima | FA23-BAI-054
+# ============================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentiment-api-service
+  labels:
+    app: sentiment-api
+    student: FA23-BAI-054
+  # Annotation records which slot is currently active
+  # Updated automatically by the rollback job
+  annotations:
+    active-slot: "blue"
+    last-rollback: "never"
+
+spec:
+  type: NodePort
+
+  # ── THIS IS THE MAGIC LINE ──
+  # selector decides which pods receive traffic
+  # Currently: slot=blue → blue deployment gets all requests
+  # After rollback: slot=green → green deployment gets all requests
+  # Changed by: kubectl patch service sentiment-api-service
+  #               -p '{"spec":{"selector":{"slot":"green"}}}'
+  selector:
+    app: sentiment-api
+    slot: blue               # ← rollback changes "blue" to "green"
+
+  ports:
+    - name: api
+      protocol: TCP
+      port: 80               # Internal cluster port
+      targetPort: 5000       # Flask container port
+      nodePort: 32500        # YOUR ASSIGNED external port
+
+    - name: metrics
+      protocol: TCP
+      port: 8000             # Internal metrics port
+      targetPort: 8000       # Exporter container port
+      # No nodePort for metrics — Prometheus accesses internally

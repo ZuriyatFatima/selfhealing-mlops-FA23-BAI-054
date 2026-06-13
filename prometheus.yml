@@ -1,0 +1,56 @@
+# ============================================================
+# prometheus.yml — Prometheus Scrape + Alerting Configuration
+# Student: Zuriyat Fatima | FA23-BAI-054
+# ============================================================
+
+global:
+  # How often Prometheus scrapes all targets
+  scrape_interval: 15s
+
+  # How often Prometheus re-evaluates alert rules
+  evaluation_interval: 15s
+
+# ─── Alert Rules ─────────────────────────────────────────────
+# Tells Prometheus where to find the alert rule files
+rule_files:
+  - "/etc/prometheus/alert.rules.yml"
+
+# ─── Alertmanager Connection ─────────────────────────────────
+# When an alert fires, Prometheus hands it to Alertmanager
+# Alertmanager then decides WHO to notify (Jenkins webhook in our case)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            # Alertmanager runs on your EC2, port 9093
+            - "35.153.30.23:9093"
+
+# ─── Scrape Targets ──────────────────────────────────────────
+# These are the "bulletin boards" Prometheus reads every 15 seconds
+scrape_configs:
+
+  # ── Target 1: Prometheus itself ──
+  # Always good practice — lets you monitor the monitor
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── Target 2: Your Sentiment API Exporter ──
+  # exporter.py runs on port 8000 inside the Minikube pod
+  # NodePort exposes it — we use the Minikube IP here
+  # (We'll update this IP after Minikube deploys — placeholder for now)
+  - job_name: "sentiment-ml-exporter"
+    static_configs:
+      - targets: ["35.153.30.23:8000"]
+    # Label all metrics from this job with app="sentiment-api"
+    # Makes Grafana filtering much easier
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "sentiment-api-blue"
+
+  # ── Target 3: Alertmanager itself ──
+  # Lets you see if Alertmanager is healthy in Grafana
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["35.153.30.23:9093"]

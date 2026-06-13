@@ -1,0 +1,29 @@
+# ============================================================
+# k8s/pvc.yaml — Persistent Volume Claim for Logs
+# Both blue and green pods share this storage
+# confidence.json lives here — read by exporter.py
+# Student: Zuriyat Fatima | FA23-BAI-054
+# ============================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sentiment-logs-pvc
+  labels:
+    app: sentiment-api
+    student: FA23-BAI-054
+
+spec:
+  # ReadWriteOnce = one pod can write at a time
+  # Fine for our use case — only active slot writes
+  accessModes:
+    - ReadWriteOnce
+
+  resources:
+    requests:
+      # 1GB is plenty for log files and confidence.json
+      storage: 1Gi
+
+  # standard = default Minikube storage class
+  # Uses hostPath under the hood on single-node Minikube
+  storageClassName: standard

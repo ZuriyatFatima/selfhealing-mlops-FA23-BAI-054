@@ -1,0 +1,99 @@
+# ============================================================
+# alert.rules.yml — Prometheus Alert Rules
+# THE CORE OF THE SELF-HEALING LOOP
+# Student: Zuriyat Fatima | FA23-BAI-054
+# ============================================================
+
+groups:
+  - name: sentiment_model_alerts
+    # How often these specific rules are evaluated
+    interval: 15s
+
+    rules:
+
+      # ════════════════════════════════════════════════════
+      # ALERT 1 — ModelConfidenceDrift (THE MAIN ALERT)
+      # This is what triggers the entire self-healing loop
+      # ════════════════════════════════════════════════════
+      - alert: ModelConfidenceDrift
+        
+        # ── Condition ──
+        # Fire when confidence stays BELOW your threshold (0.667)
+        # for 1 full continuous minute
+        # avg() smooths out brief single-prediction dips
+        expr: >
+          avg(sentiment_prediction_confidence) < 0.667
+
+        # ── Duration ──
+        # Must stay below threshold for this long before alert fires
+        # Prevents false alarms from one bad prediction
+        # YOUR ASSIGNED VALUE: 1 minute
+        for: 1m
+
+        # ── Labels ──
+        # Used by Alertmanager to route this alert correctly
+        labels:
+          severity: critical
+          team: mlops
+          project: FA23-BAI-054
+
+        # ── Annotations ──
+        # Human-readable info attached to the alert notification
+        # These appear in Jenkins logs and Alertmanager UI
+        annotations:
+          summary: "Model confidence drift detected"
+          description: >
+            Sentiment model confidence has been below 0.667
+            for over 1 minute. Current value: {{ $value | printf "%.4f" }}.
+            Triggering automatic rollback to stable-v0-1C3A.
+          runbook: >
+            Automatic rollback initiated via Jenkins job
+            rollback-to-stable. No human action required.
+          threshold: "0.667"
+          student: "Zuriyat Fatima FA23-BAI-054"
+
+      # ════════════════════════════════════════════════════
+      # ALERT 2 — ModelExporterDown (safety net alert)
+      # Fires if the exporter itself stops responding
+      # ════════════════════════════════════════════════════
+      - alert: ModelExporterDown
+        
+        # up == 0 means Prometheus can't reach the scrape target
+        expr: up{job="sentiment-api"} == 0
+
+        # Fire after 30 seconds of being unreachable
+        for: 30s
+
+        labels:
+          severity: warning
+          team: mlops
+
+        annotations:
+          summary: "Sentiment API exporter is unreachable"
+          description: >
+            Prometheus cannot scrape the sentiment API exporter
+            at port 8000. The service may be down.
+
+      # ════════════════════════════════════════════════════
+      # ALERT 3 — ModelConfidenceRecovered (informational)
+      # Fires when confidence comes back ABOVE threshold
+      # Useful for confirming the rollback worked in Grafana
+      # ════════════════════════════════════════════════════
+      - alert: ModelConfidenceRecovered
+        
+        expr: >
+          avg(sentiment_prediction_confidence) >= 0.667
+
+        # Only alert after stable for 30 seconds
+        # (avoids flapping between recovered/drifting)
+        for: 30s
+
+        labels:
+          severity: info
+          team: mlops
+
+        annotations:
+          summary: "Model confidence restored above threshold"
+          description: >
+            Sentiment model confidence is now {{ $value | printf "%.4f" }},
+            above the 0.667 threshold. Stable fallback is working correctly.

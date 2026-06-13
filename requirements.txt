@@ -1,0 +1,8 @@
+# requirements.txt
+flask==3.0.3
+transformers==4.40.0
+torch==2.3.0
+prometheus-client==0.20.0
+requests==2.31.0
+selenium==4.21.0
+pytest==8.2.0

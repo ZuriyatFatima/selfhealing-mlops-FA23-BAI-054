@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-green-deployment
+  labels:
+    app: sentiment-api
+    slot: green
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sentiment-api
+      slot: green
+  template:
+    metadata:
+      labels:
+        app: sentiment-api
+        slot: green
+    spec:
+      containers:
+        - name: sentiment-api          # MUST match kubectl set image command
+          image: zuriyat/sentiment-api:stable
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 3
+          volumeMounts:
+            - name: log-storage
+              mountPath: /app/logs
+      volumes:
+        - name: log-storage
+          persistentVolumeClaim:
+            claimName: sentiment-logs-pvc

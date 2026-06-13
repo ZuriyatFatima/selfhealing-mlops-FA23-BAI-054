@@ -1,138 +1,66 @@
-# ============================================================
-# app.py — Flask Sentiment Analysis API (Unstable / Blue Slot)
-# Model: DistilBERT fine-tuned on SST-2 (positive/negative)
-# Student: Zuriyat Fatima | FA23-BAI-054
-# ============================================================
-
-import os
-import json
-import logging
-from datetime import datetime
 from flask import Flask, request, jsonify, render_template
 from transformers import pipeline
+import time, random, os
 
-# ─── Logging Setup ───────────────────────────────────────────
-# Logs go to /app/logs/api.log (mounted via PVC) AND console
-os.makedirs("/app/logs", exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler("/app/logs/api.log"),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# ─── Flask App ───────────────────────────────────────────────
 app = Flask(__name__)
+classifier = pipeline(
+    "sentiment-analysis",
+    model="distilbert-base-uncased-finetuned-sst-2-english")
 
-# ─── Model Identity ──────────────────────────────────────────
-# This is the UNSTABLE (blue) model — DistilBERT
-# The stable-fallback has model_version = "stable-v0-1C3A"
-MODEL_VERSION = "unstable-v1"
+LOG_FILE = "/app/logs/predictions.log"
+os.makedirs("/app/logs", exist_ok=True)
 
-# ─── Load DistilBERT ─────────────────────────────────────────
-# 'sentiment-analysis' uses distilbert-base-uncased-finetuned-sst-2-english
-# This downloads ~250MB on first run — cached after that
-logger.info("Loading DistilBERT model... (first run may take 1-2 minutes)")
-try:
-    sentiment_pipeline = pipeline(
-        "sentiment-analysis",
-        model="distilbert-base-uncased-finetuned-sst-2-english"
-    )
-    logger.info("DistilBERT loaded successfully.")
-except Exception as e:
-    logger.error(f"Failed to load model: {e}")
-    raise
-
-# ─── Confidence Log File ─────────────────────────────────────
-# exporter.py reads this file to get the latest confidence score
-# Think of it as a sticky note the chef leaves for the inspector
-CONFIDENCE_LOG = "/app/logs/confidence.json"
-
-def write_confidence(score: float, label: str, text: str):
-    """Write latest prediction confidence to a shared JSON file."""
-    data = {
-        "confidence": round(score, 4),
-        "label": label,
-        "text": text[:100],           # truncate long inputs
-        "timestamp": datetime.utcnow().isoformat(),
-        "model_version": MODEL_VERSION
-    }
-    with open(CONFIDENCE_LOG, "w") as f:
-        json.dump(data, f)
-
-# ─── Routes ──────────────────────────────────────────────────
-
-@app.route("/health", methods=["GET"])
-def health():
-    """Health check — Kubernetes liveness probe uses this."""
-    return jsonify({
-        "status": "healthy",
-        "model_version": MODEL_VERSION
-    }), 200
-
-
-@app.route("/predict", methods=["POST"])
-def predict():
-    """
-    Main prediction endpoint.
-    Expects JSON: { "text": "your sentence here" }
-    Returns:      { "label": "POSITIVE", "confidence": 0.98, "model_version": "..." }
-    """
-    # --- Validate input ---
-    data = request.get_json(silent=True)
-    if not data or "text" not in data:
-        return jsonify({"error": "Missing 'text' field in request body"}), 400
-
-    text = data["text"].strip()
-    if not text:
-        return jsonify({"error": "Text field cannot be empty"}), 400
-
-    # --- Run prediction ---
-    try:
-        result = sentiment_pipeline(text)[0]
-        label      = result["label"]       # "POSITIVE" or "NEGATIVE"
-        confidence = result["score"]       # float between 0.0 and 1.0
-
-        # Write confidence for Prometheus exporter to pick up
-        write_confidence(confidence, label, text)
-
-        logger.info(f"Predicted: {label} ({confidence:.4f}) | Text: '{text[:60]}...'")
-
-        return jsonify({
-            "label":         label,
-            "confidence":    round(confidence, 4),
-            "model_version": MODEL_VERSION,
-            "text":          text
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Prediction error: {e}")
-        return jsonify({"error": "Prediction failed", "details": str(e)}), 500
-
-
-@app.route("/metrics-info", methods=["GET"])
-def metrics_info():
-    """
-    Returns the latest confidence reading as JSON.
-    (Separate from /metrics which is served by exporter.py on port 8000)
-    """
-    try:
-        with open(CONFIDENCE_LOG, "r") as f:
-            return jsonify(json.load(f)), 200
-    except FileNotFoundError:
-        return jsonify({"confidence": None, "message": "No predictions yet"}), 200
-
+_request_count = 0
+_drift_injected = False
 
 @app.route("/", methods=["GET"])
 def index():
-    """Simple HTML frontend for manual UI testing (Selenium uses this)."""
-    return render_template('index.html')
+    return render_template("index.html")
 
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status":"healthy","model":"distilbert-sentiment-v1",
+                    "model_version":"unstable-v1"})
 
-# ─── Entry Point ─────────────────────────────────────────────
+@app.route("/predict", methods=["POST"])
+def predict():
+    global _request_count, _drift_injected
+    _request_count += 1
+    data = request.get_json()
+    text = data.get("text", "")
+    result = classifier(text)[0]
+    confidence = result["score"]
+    if _drift_injected:
+        confidence = confidence * random.uniform(0.3, 0.6)
+    with open(LOG_FILE, "a") as f:
+        f.write(f"{time.time()},{confidence:.4f}\n")
+    return jsonify({"label":result["label"],"confidence":round(confidence,4),
+                    "model_version":"unstable-v1","request_count":_request_count})
+
+@app.route("/api/latest-confidence", methods=["GET"])
+def latest_confidence():
+    """Polled by exporter.py on EC2."""
+    try:
+        with open(LOG_FILE, "r") as f:
+            lines = [l.strip() for l in f.readlines() if l.strip()]
+        if lines:
+            _, conf = lines[-1].split(",")
+            return jsonify({"confidence": float(conf)})
+    except Exception:
+        pass
+    return jsonify({"confidence": 1.0})
+
+@app.route("/inject-drift", methods=["POST"])
+def inject_drift():
+    global _drift_injected
+    _drift_injected = True
+    return jsonify({"status": "drift_injected"})
+
+@app.route("/reset", methods=["POST"])
+def reset():
+    global _drift_injected, _request_count
+    _drift_injected = False; _request_count = 0
+    return jsonify({"status": "reset"})
+
 if __name__ == "__main__":
-    # host="0.0.0.0" makes Flask reachable from outside the container
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000)

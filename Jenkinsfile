@@ -1,5 +1,8 @@
 pipeline {
     agent any
+    options {
+        disableConcurrentBuilds()
+    }
     environment {
         IMAGE_NAME     = "zuriyat/sentiment-api"
         CONTAINER_NAME = "sentiment-api-test"
@@ -21,7 +24,7 @@ pipeline {
                     echo "Waiting for API to be ready..."
                     for i in $(seq 1 24); do
                         sleep 5
-                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://172.17.0.1:5000/health 2>/dev/null || echo "000")
+                        STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://172.17.0.1:5000/health 2>/dev/null || echo "000")
                         echo "Attempt $i: HTTP $STATUS"
                         if [ "$STATUS" = "200" ]; then
                             echo "API is ready!"

@@ -42,10 +42,10 @@ pipeline {
         }
         stage('UI Test') {
             steps {
-                echo "Stage 4: Running Selenium UI tests..."
+                echo "Stage 4: Running Selenium UI tests inside Jenkins container (has Chrome)..."
                 sh '''
-                    pip3 install selenium pytest --break-system-packages || true
-                    API_BASE_URL=http://172.17.0.1:5000 python3 -m pytest tests/test_ui.py -v
+                    docker exec -e API_BASE_URL=http://172.17.0.1:5000 jenkins \
+                        python3 -m pytest /var/jenkins_home/workspace/sentiment-ci-pipeline/tests/test_ui.py -v
                 '''
             }
         }

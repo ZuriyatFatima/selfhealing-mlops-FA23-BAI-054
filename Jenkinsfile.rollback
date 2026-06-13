@@ -3,18 +3,41 @@ pipeline {
 
     stages {
 
-        // SINGLE STAGE: Flip the service selector from "blue" to "green"
-        stage('Switch Traffic to Stable (Green)') {
+        stage('Rollback: Switch Traffic to Stable (Green)') {
             steps {
-                echo "ALERT TRIGGERED: Low confidence detected. Rolling back traffic to the stable (green) model..."
-                withKubeConfig([credentialsId: 'kubeconfig']) {
-                    sh '''
+                echo "ALERT TRIGGERED: Low confidence detected. Rolling back to stable-v0-1C3A..."
+                sh '''
+                    ssh -i /var/jenkins_home/.ssh/host_key \
+                        -o StrictHostKeyChecking=no \
+                        ubuntu@172.17.0.1 \
+                        "set -e
+                        echo '=== Switching service selector to slot:green ==='
                         kubectl patch service sentiment-api-service \
-                          -p '{"spec":{"selector":{"slot":"green"}}}'
-                    '''
-                }
-                echo "Rollback complete. Traffic is now being served by the stable model (1C3A)."
+                          -p '{\"spec\":{\"selector\":{\"app\":\"sentiment-api\",\"slot\":\"green\"}}}' \
+                          --type=merge
+
+                        echo '=== Annotating rollback time ==='
+                        kubectl annotate service sentiment-api-service \
+                          last-rollback=\$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+                          active-slot=green \
+                          --overwrite
+
+                        echo '=== Verifying green pods are receiving traffic ==='
+                        kubectl get service sentiment-api-service -o jsonpath='{.spec.selector}'
+                        echo ''
+                        kubectl get pods -l slot=green -o wide"
+                '''
+                echo "Rollback complete. Traffic now served by stable-v0-1C3A (green slot)."
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Self-healing rollback SUCCEEDED. Model: stable-v0-1C3A | Token: ROLLBACK_0FAA6A_TOKEN"
+        }
+        failure {
+            echo "Rollback FAILED — manual intervention required."
         }
     }
 }

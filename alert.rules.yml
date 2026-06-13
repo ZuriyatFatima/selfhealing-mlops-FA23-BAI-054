@@ -22,7 +22,7 @@ groups:
         # for 1 full continuous minute
         # avg() smooths out brief single-prediction dips
         expr: >
-          avg(sentiment_prediction_confidence) < 0.667
+          avg(prediction_confidence_score) < 0.667
 
         # ── Duration ──
         # Must stay below threshold for this long before alert fires
@@ -82,7 +82,7 @@ groups:
       - alert: ModelConfidenceRecovered
         
         expr: >
-          avg(sentiment_prediction_confidence) >= 0.667
+          avg(prediction_confidence_score) >= 0.667
 
         # Only alert after stable for 30 seconds
         # (avoids flapping between recovered/drifting)

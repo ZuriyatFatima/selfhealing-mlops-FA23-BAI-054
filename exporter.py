@@ -22,7 +22,7 @@ prediction_confidence_score = Gauge(
 )
 
 # Poll the app via NodePort — this is how exporter reaches the pod
-APP_URL = "http://localhost:32500/api/latest-confidence"
+APP_URL = "http://192.168.49.2:32500/metrics-info"
 POLL_INTERVAL = 5   # seconds — spec says every 5s
 
 if __name__ == "__main__":

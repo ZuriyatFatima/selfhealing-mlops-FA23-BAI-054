@@ -22,7 +22,8 @@ pipeline {
                     docker build -t ${IMAGE_NAME}:unstable .
                     docker rm -f ${CONTAINER_NAME} || true
                     docker run -d --name ${CONTAINER_NAME} -p 5000:5000 ${IMAGE_NAME}:unstable
-                    sleep 15
+                    echo "Waiting 60s for DistilBERT model to load..."
+                    sleep 60
                 '''
             }
         }
@@ -53,11 +54,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                         echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-
-                        # Unstable image (already built in stage 2, just push)
                         docker push ${IMAGE_NAME}:unstable
-
-                        # Stable image — built from Dockerfile.stable
                         docker build -t ${IMAGE_NAME}:stable -f Dockerfile.stable .
                         docker push ${IMAGE_NAME}:stable
                     '''
@@ -75,7 +72,7 @@ pipeline {
                         kubectl apply -f k8s/green-deployment.yaml
                         kubectl apply -f k8s/service.yaml
                         kubectl set image deployment/sentiment-blue-deployment sentiment-api=${IMAGE_NAME}:unstable
-                        kubectl rollout status deployment/sentiment-blue-deployment --timeout=120s
+                        kubectl rollout status deployment/sentiment-blue-deployment --timeout=180s
                     '''
                 }
             }
@@ -86,6 +83,7 @@ pipeline {
         always {
             echo "Cleaning up test container..."
             sh 'docker rm -f ${CONTAINER_NAME} || true'
+            sh 'docker system prune -f || true'
         }
     }
 }

@@ -1,0 +1,20 @@
+pipeline {
+    agent any
+
+    stages {
+
+        // SINGLE STAGE: Flip the service selector from "blue" to "green"
+        stage('Switch Traffic to Stable (Green)') {
+            steps {
+                echo "ALERT TRIGGERED: Low confidence detected. Rolling back traffic to the stable (green) model..."
+                withKubeConfig([credentialsId: 'kubeconfig']) {
+                    sh '''
+                        kubectl patch service sentiment-api-service \
+                          -p '{"spec":{"selector":{"slot":"green"}}}'
+                    '''
+                }
+                echo "Rollback complete. Traffic is now being served by the stable model (1C3A)."
+            }
+        }
+    }
+}

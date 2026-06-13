@@ -30,7 +30,7 @@ app = Flask(__name__)
 # ─── Model Identity ──────────────────────────────────────────
 # This is the UNSTABLE (blue) model — DistilBERT
 # The stable-fallback has model_version = "stable-v0-1C3A"
-MODEL_VERSION = "distilbert-v1-unstable"
+MODEL_VERSION = "unstable-v1"
 
 # ─── Load DistilBERT ─────────────────────────────────────────
 # 'sentiment-analysis' uses distilbert-base-uncased-finetuned-sst-2-english
@@ -135,7 +135,7 @@ def index():
     <head><title>Sentiment API</title></head>
     <body>
         <h2>Sentiment Analysis API</h2>
-        <p>Model: <strong id="model">distilbert-v1-unstable</strong></p>
+        <p>Model: <strong id="model">unstable-v1</strong></p>
         <textarea id="inputText" rows="4" cols="50"
             placeholder="Enter text to analyse..."></textarea><br><br>
         <button onclick="analyse()">Analyse</button>

@@ -3,7 +3,7 @@ pipeline {
 
     stages {
 
-        stage('Rollback: Switch Traffic to Stable (Green)') {
+        stage('Switch Traffic to Stable (Green)') {
             steps {
                 echo "ALERT TRIGGERED: Low confidence detected. Rolling back to stable-v0-1C3A..."
                 sh '''

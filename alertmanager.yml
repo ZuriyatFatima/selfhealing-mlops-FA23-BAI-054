@@ -1,104 +1,27 @@
-# ============================================================
-# alertmanager.yml — Alert Routing + Jenkins Webhook Config
-# Student: Zuriyat Fatima | FA23-BAI-054
-# Webhook Token: ROLLBACK_0FAA6A_TOKEN
-# ============================================================
-
 global:
-
-  # How long an alert must be resolved before it's considered "resolved"
   resolve_timeout: 1m
 
-# ─── Routing Tree ────────────────────────────────────────────
-# Think of this as a post office sorting system
-# Every alert comes in → gets matched → sent to correct "receiver"
 route:
-
-  # Default receiver if nothing else matches
   receiver: "jenkins-rollback-webhook"
-
-  # Group alerts by these labels before sending
-  # Prevents 100 individual notifications for the same issue
-  group_by: ["alertname", "severity", "team"]
-
-  # Wait this long to collect more alerts before sending as a group
+  group_by: ["alertname", "severity"]
   group_wait: 10s
-
-  # After first notification, wait this long before sending another
   group_interval: 1m
-
-  # How long before Alertmanager re-notifies about ongoing alert
   repeat_interval: 5m
-
-  # ── Child Routes ──
-  # More specific rules checked BEFORE the default above
   routes:
-
-    # ── Route 1: Critical alerts → Jenkins rollback ──
-    # ModelConfidenceDrift is severity:critical → goes here
     - match:
         severity: critical
       receiver: "jenkins-rollback-webhook"
-      # Don't wait — fire immediately for critical alerts
       group_wait: 5s
       repeat_interval: 5m
 
-    # ── Route 2: Warning alerts → Jenkins log only ──
-    # ModelExporterDown is severity:warning → goes here
-    - match:
-        severity: warning
-      receiver: "jenkins-rollback-webhook"
-      group_wait: 15s
-      repeat_interval: 10m
-
-    # ── Route 3: Info alerts → silenced ──
-    # ModelConfidenceRecovered is severity:info
-    # We don't need Jenkins to do anything when it recovers
-    - match:
-        severity: info
-      receiver: "null-receiver"
-
-# ─── Receivers ───────────────────────────────────────────────
-# Receivers are the actual notification destinations
 receivers:
-
-  # ── Receiver 1: Jenkins Webhook ──
-  # This hits the Generic Webhook Trigger plugin on your Jenkins
-  # The token ROLLBACK_0FAA6A_TOKEN identifies WHICH job to trigger
   - name: "jenkins-rollback-webhook"
     webhook_configs:
       - url: "http://35.153.30.23:8080/generic-webhook-trigger/invoke?token=ROLLBACK_0FAA6A_TOKEN"
-
-        # Send even when alert RESOLVES (good for logging)
-        send_resolved: true
-
-        # ── HTTP settings ──
-        http_config:
-          # Timeout for the webhook POST request
-          # Jenkins should respond within 10 seconds
-          follow_redirects: true
-
-        # ── Custom payload ──
-        # This JSON body is what Jenkins receives
-        # You can extract these fields in the Jenkinsfile
-        # using Generic Webhook Trigger's JSONPath variables
-        max_alerts: 1
-
-  # ── Receiver 2: Null receiver ──
-  # Silently discards alerts — used for info-level alerts
-  - name: "null-receiver"
-    webhook_configs:
-      - url: "http://localhost:9999/devnull"
         send_resolved: false
+        http_config:
+          basic_auth:
+            username: "admin"
+            password: "11fefb75479347ea2d8fde33526408be1e"
 
-# ─── Inhibition Rules ────────────────────────────────────────
-# If a CRITICAL alert is firing, suppress related WARNING alerts
-# (no point getting warned about the exporter if you're already
-# doing a full rollback)
-inhibit_rules:
-  - source_match:
-      severity: "critical"
-    target_match:
-      severity: "warning"
-    # Only inhibit if they share the same job label
-    equal: ["team"]
+inhibit_rules: []

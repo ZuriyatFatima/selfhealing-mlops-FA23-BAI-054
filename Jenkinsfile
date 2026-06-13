@@ -69,17 +69,23 @@ pipeline {
         }
         stage('Deploy to Minikube') {
             steps {
-                echo "Stage 6: Deploying to Minikube..."
-                withKubeConfig([credentialsId: 'kubeconfig']) {
-                    sh '''
-                        kubectl apply -f k8s/pvc.yaml
-                        kubectl apply -f k8s/blue-deployment.yaml
-                        kubectl apply -f k8s/green-deployment.yaml
-                        kubectl apply -f k8s/service.yaml
-                        kubectl set image deployment/sentiment-blue-deployment sentiment-api=${IMAGE_NAME}:unstable
+                echo "Stage 6: Deploying to Minikube via SSH..."
+                sh '''
+                    ssh -i /var/jenkins_home/.ssh/host_key \
+                        -o StrictHostKeyChecking=no \
+                        ubuntu@172.17.0.1 \
+                        "set -e
+                        kubectl apply -f /home/ubuntu/selfhealing-mlops-FA23-BAI-054/k8s/pvc.yaml
+                        kubectl apply -f /home/ubuntu/selfhealing-mlops-FA23-BAI-054/k8s/blue-deployment.yaml
+                        kubectl apply -f /home/ubuntu/selfhealing-mlops-FA23-BAI-054/k8s/green-deployment.yaml
+                        kubectl apply -f /home/ubuntu/selfhealing-mlops-FA23-BAI-054/k8s/service.yaml
+                        kubectl set image deployment/sentiment-blue-deployment sentiment-api=zuriyat/sentiment-api:unstable
                         kubectl rollout status deployment/sentiment-blue-deployment --timeout=180s
-                    '''
-                }
+                        echo '=== Pods ==='
+                        kubectl get pods -o wide
+                        echo '=== Services ==='
+                        kubectl get svc"
+                '''
             }
         }
     }

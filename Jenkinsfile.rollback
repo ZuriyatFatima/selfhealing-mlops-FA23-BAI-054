@@ -9,23 +9,24 @@ pipeline {
                 sh '''
                     ssh -i /var/jenkins_home/.ssh/host_key \
                         -o StrictHostKeyChecking=no \
-                        ubuntu@172.17.0.1 \
-                        "set -e
-                        echo '=== Switching service selector to slot:green ==='
-                        kubectl patch service sentiment-api-service \
-                          -p '{\"spec\":{\"selector\":{\"app\":\"sentiment-api\",\"slot\":\"green\"}}}' \
-                          --type=merge
+                        ubuntu@172.17.0.1 bash << 'ENDSSH'
+set -e
+echo "=== Switching service selector to slot:green ==="
+kubectl patch service sentiment-api-service \
+  --type=merge \
+  -p '{"spec":{"selector":{"app":"sentiment-api","slot":"green"}}}'
 
-                        echo '=== Annotating rollback time ==='
-                        kubectl annotate service sentiment-api-service \
-                          last-rollback=\$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-                          active-slot=green \
-                          --overwrite
+echo "=== Annotating rollback time ==="
+kubectl annotate service sentiment-api-service \
+  last-rollback="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  active-slot=green \
+  --overwrite
 
-                        echo '=== Verifying green pods are receiving traffic ==='
-                        kubectl get service sentiment-api-service -o jsonpath='{.spec.selector}'
-                        echo ''
-                        kubectl get pods -l slot=green -o wide"
+echo "=== Verifying selector ==="
+kubectl get service sentiment-api-service -o jsonpath='{.spec.selector}'
+echo ""
+kubectl get pods -l slot=green -o wide
+ENDSSH
                 '''
                 echo "Rollback complete. Traffic now served by stable-v0-1C3A (green slot)."
             }

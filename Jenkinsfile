@@ -22,8 +22,18 @@ pipeline {
                     docker build -t ${IMAGE_NAME}:unstable .
                     docker rm -f ${CONTAINER_NAME} || true
                     docker run -d --name ${CONTAINER_NAME} -p 5000:5000 ${IMAGE_NAME}:unstable
-                    echo "Waiting 60s for DistilBERT model to load..."
-                    sleep 60
+
+                    # Wait up to 120s for Flask to actually respond
+                    echo "Waiting for API to be ready..."
+                    for i in $(seq 1 24); do
+                        sleep 5
+                        STATUS=$(docker exec ${CONTAINER_NAME} curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health 2>/dev/null || echo "000")
+                        echo "Attempt $i: HTTP $STATUS"
+                        if [ "$STATUS" = "200" ]; then
+                            echo "API is ready!"
+                            break
+                        fi
+                    done
                 '''
             }
         }

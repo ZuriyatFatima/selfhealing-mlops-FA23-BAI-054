@@ -8,7 +8,7 @@ import os
 import json
 import logging
 from datetime import datetime
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from transformers import pipeline
 
 # ─── Logging Setup ───────────────────────────────────────────
@@ -129,34 +129,7 @@ def metrics_info():
 @app.route("/", methods=["GET"])
 def index():
     """Simple HTML frontend for manual UI testing (Selenium uses this)."""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head><title>Sentiment API</title></head>
-    <body>
-        <h2>Sentiment Analysis API</h2>
-        <p>Model: <strong id="model">unstable-v1</strong></p>
-        <textarea id="inputText" rows="4" cols="50"
-            placeholder="Enter text to analyse..."></textarea><br><br>
-        <button onclick="analyse()">Analyse</button>
-        <p id="result"></p>
-
-        <script>
-        async function analyse() {
-            const text = document.getElementById('inputText').value;
-            const res  = await fetch('/predict', {
-                method:  'POST',
-                headers: {'Content-Type': 'application/json'},
-                body:    JSON.stringify({text: text})
-            });
-            const data = await res.json();
-            document.getElementById('result').innerText =
-                'Label: ' + data.label + ' | Confidence: ' + data.confidence;
-        }
-        </script>
-    </body>
-    </html>
-    """, 200
+    return render_template('index.html')
 
 
 # ─── Entry Point ─────────────────────────────────────────────

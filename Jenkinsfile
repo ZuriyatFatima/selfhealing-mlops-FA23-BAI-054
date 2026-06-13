@@ -32,7 +32,7 @@ pipeline {
             steps {
                 echo "Stage 3: Running pytest unit tests..."
                 sh '''
-                    pip install requests pytest --break-system-packages || true
+                    pip3 install requests pytest --break-system-packages || true
                     API_BASE_URL=http://localhost:5000 python3 -m pytest tests/test_api.py -v
                 '''
             }
@@ -42,7 +42,7 @@ pipeline {
             steps {
                 echo "Stage 4: Running Selenium UI tests..."
                 sh '''
-                    pip install selenium pytest --break-system-packages || true
+                    pip3 install selenium pytest --break-system-packages || true
                     API_BASE_URL=http://localhost:5000 python3 -m pytest tests/test_ui.py -v
                 '''
             }

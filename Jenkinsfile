@@ -18,8 +18,8 @@ pipeline {
             steps {
                 echo "Stage 2: Building Docker image and starting test container..."
                 sh '''
-                    docker build -t ${IMAGE_NAME}:unstable .
                     docker rm -f ${CONTAINER_NAME} || true
+                    docker pull ${IMAGE_NAME}:unstable
                     docker run -d --name ${CONTAINER_NAME} -p 5000:5000 ${IMAGE_NAME}:unstable
                     echo "Waiting for API to be ready..."
                     for i in $(seq 1 24); do
@@ -60,6 +60,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                         echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker build -t ${IMAGE_NAME}:unstable .
                         docker push ${IMAGE_NAME}:unstable
                         docker build -t ${IMAGE_NAME}:stable -f Dockerfile.stable .
                         docker push ${IMAGE_NAME}:stable
